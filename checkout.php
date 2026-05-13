@@ -90,8 +90,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $order_id = $link->insert_id;
                 $stmt->close();
                 
-                // Создание элементов заказа (если есть таблица order_items)
-                // Пока просто сохраняем список товаров в items_note
+                // Создание элементов заказа в таблице order_items
+                $stmt_item = $link->prepare('INSERT INTO order_items (order_id, product_id, title, price, quantity, subtotal) VALUES (?, ?, ?, ?, ?, ?)');
+                foreach ($cart_items as $item) {
+                    $pid = (int) $item['product_id'];
+                    $title = $item['title'];
+                    $price = (float) $item['price'];
+                    $qty = (int) $item['qty'];
+                    $subtotal = (float) $item['subtotal'];
+                    $stmt_item->bind_param('iissdi', $order_id, $pid, $title, $price, $qty, $subtotal);
+                    $stmt_item->execute();
+                }
+                $stmt_item->close();
                 
                 $link->commit();
                 

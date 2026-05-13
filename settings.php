@@ -269,6 +269,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
                     $stmt->execute();
                     $result = $stmt->get_result();
                     while ($row = $result->fetch_assoc()) {
+                        $oid = (int) $row['order_id'];
+                        // Загружаем элементы заказа
+                        $items_res = $link->query("SELECT product_id, title, price, quantity, subtotal FROM order_items WHERE order_id = $oid ORDER BY item_id");
+                        $row['items'] = $items_res ? $items_res->fetch_all(MYSQLI_ASSOC) : [];
                         $user_orders[] = $row;
                     }
                     $stmt->close();
@@ -312,7 +316,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
                                 <tr>
                                     <td>#<?= (int) $o['order_id'] ?></td>
                                     <td><?= date('d.m.Y H:i', strtotime($o['created_at'])) ?></td>
-                                    <td style="max-width:250px;"><?= htmlspecialchars($o['items_note'] ?? '-') ?></td>
+                                    <td style="max-width:280px;">
+                                        <?php if (!empty($o['items'])): ?>
+                                            <ul style="margin:0.5rem 0; padding-left:1rem;">
+                                                <?php foreach ($o['items'] as $item): ?>
+                                                    <li>
+                                                        <?= htmlspecialchars($item['title']) ?> 
+                                                        × <?= (int) $item['quantity'] ?> 
+                                                        = <?= number_format((float) $item['subtotal'], 0, '', ' ') ?> ₽
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        <?php else: ?>
+                                            <?= htmlspecialchars($o['items_note'] ?? '-') ?>
+                                        <?php endif; ?>
+                                        <?php if (!empty($o['customer_request'])): ?>
+                                            <div style="font-size:var(--font-xs); color:#666; margin-top:0.35rem;">
+                                                <strong>Пожелание:</strong> <?= nl2br(htmlspecialchars($o['customer_request'], ENT_QUOTES, 'UTF-8')) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= number_format((float) $o['total_amount'], 0, '', ' ') ?> ₽</td>
                                     <td><span class="badge <?= $status_info[1] ?>"><?= $status_info[0] ?></span></td>
                                     <td>
