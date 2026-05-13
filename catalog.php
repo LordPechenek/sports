@@ -6,6 +6,30 @@ require_once __DIR__ . '/csrf.php';
 
 shop_ensure_schema($link);
 
+// Обработка AJAX запроса для быстрого просмотра
+if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+    if (isset($_GET['quick_view'])) {
+        $pid = (int)$_GET['quick_view'];
+        $stmt = $link->prepare("SELECT * FROM catalog WHERE product_id = ?");
+        $stmt->bind_param("i", $pid);
+        $stmt->execute();
+        $product = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        
+        if ($product) {
+            echo '<h2 style="margin-bottom:1rem;">' . htmlspecialchars($product['title']) . '</h2>';
+            echo '<img src="' . (!empty($product['image']) ? 'uploads/catalog/' . htmlspecialchars($product['image']) : 'img/placeholder.png') . '" alt="' . htmlspecialchars($product['title']) . '" style="width:100%;max-height:400px;object-fit:contain;margin-bottom:1rem;border-radius:8px;">';
+            echo '<p style="color:#666;margin-bottom:1rem;">' . nl2br(htmlspecialchars($product['description'] ?? '')) . '</p>';
+            echo '<p style="font-size:1.5rem;font-weight:bold;color:var(--primary-color);margin-bottom:1rem;">' . number_format($product['price'], 0, '', ' ') . ' ₽</p>';
+            if (isset($product['stock_qty'])) {
+                echo '<p style="color:' . ($product['stock_qty'] > 0 ? '#28a745' : '#dc3545') . ';margin-bottom:1rem;">' . ($product['stock_qty'] > 0 ? 'В наличии: ' . (int)$product['stock_qty'] . ' шт.' : 'Нет в наличии') . '</p>';
+            }
+        }
+        $link->close();
+        exit;
+    }
+}
+
 $filter_cats = [];
 if (shop_table_exists($link, 'shop_category')) {
     $r = $link->query('SELECT slug, name FROM shop_category ORDER BY sort_order, name');
@@ -15,13 +39,49 @@ if (shop_table_exists($link, 'shop_category')) {
     }
 }
 
+// Поиск и фильтры
+$search = $_GET['search'] ?? '';
+$min_price = $_GET['min_price'] ?? '';
+$max_price = $_GET['max_price'] ?? '';
+$category = $_GET['category'] ?? '';
+
 $products = [];
 try {
     $sql = 'SELECT c.product_id, c.title, c.description, c.price, c.stock_qty, c.image, c.category_id, sc.slug AS cat_slug
         FROM catalog c
         LEFT JOIN shop_category sc ON c.category_id = sc.category_id
-        ORDER BY c.product_id DESC';
+        WHERE 1=1';
+    
+    $params = [];
+    $types = '';
+    
+    if ($search !== '') {
+        $sql .= ' AND c.title LIKE ?';
+        $params[] = '%' . $search . '%';
+        $types .= 's';
+    }
+    if ($min_price !== '') {
+        $sql .= ' AND c.price >= ?';
+        $params[] = (float)$min_price;
+        $types .= 'd';
+    }
+    if ($max_price !== '') {
+        $sql .= ' AND c.price <= ?';
+        $params[] = (float)$max_price;
+        $types .= 'd';
+    }
+    if ($category !== '') {
+        $sql .= ' AND sc.slug = ?';
+        $params[] = $category;
+        $types .= 's';
+    }
+    
+    $sql .= ' ORDER BY c.product_id DESC';
+    
     $stmt = $link->prepare($sql);
+    if (!empty($params)) {
+        $stmt->bind_param($types, ...$params);
+    }
     $stmt->execute();
     $products = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -102,16 +162,27 @@ $review_err = isset($_GET['review_err']);
         </div>
     </header>
     <main>
+        <!-- Хлебные крошки -->
+        <nav class="breadcrumbs" aria-label="Хлебные крошки">
+            <div class="container">
+                <a href="index.php">Главная</a>
+                <span class="separator">/</span>
+                <span class="current">Каталог</span>
+            </div>
+        </nav>
+        
         <section class="catalog-section">
             <h1>Каталог продуктов</h1>
             <div class="catalog-filters">
-                <input type="text" placeholder="Поиск по названию..." class="search-input" id="searchInput">
+                <input type="text" placeholder="Поиск по названию..." class="search-input" id="searchInput" value="<?= htmlspecialchars($search) ?>">
                 <select class="filter-select" id="categoryFilter">
                     <option value="">Все категории</option>
                     <?php foreach ($filter_cats as $fc): ?>
-                        <option value="<?= htmlspecialchars($fc['slug'], ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($fc['name'], ENT_QUOTES, 'UTF-8') ?></option>
+                        <option value="<?= htmlspecialchars($fc['slug'], ENT_QUOTES, 'UTF-8') ?>" <?= $category === $fc['slug'] ? 'selected' : '' ?>><?= htmlspecialchars($fc['name'], ENT_QUOTES, 'UTF-8') ?></option>
                     <?php endforeach; ?>
                 </select>
+                <input type="number" placeholder="Цена от" class="search-input" id="priceMin" value="<?= htmlspecialchars($min_price) ?>" style="max-width:120px;">
+                <input type="number" placeholder="Цена до" class="search-input" id="priceMax" value="<?= htmlspecialchars($max_price) ?>" style="max-width:120px;">
             </div>
             <div class="collection-grid" id="productsGrid">
                 <?php if (empty($products)): ?>
@@ -141,16 +212,14 @@ $review_err = isset($_GET['review_err']);
                             <?php endif; ?>
 
                             <span class="item-price"><?= $price_fmt ?> ₽</span>
-                            <?php if (!empty($_SESSION['logged_in'])): ?>
-                                <form method="POST" action="cart.php" style="display:inline;">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="action" value="add">
-                                    <input type="hidden" name="product_id" value="<?= $pid ?>">
-                                    <button type="submit" class="item-order-btn" style="border:none;cursor:pointer;background:var(--primary-color);color:#fff;padding:0.5rem 1rem;border-radius:6px;">В корзину</button>
-                                </form>
-                            <?php else: ?>
-                                <a class="item-order-btn" href="login.php">Войти для заказа</a>
-                            <?php endif; ?>
+                            <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                                <?php if (!empty($_SESSION['logged_in'])): ?>
+                                    <button type="button" class="item-order-btn add-to-cart-btn" data-product-id="<?= $pid ?>" style="border:none;cursor:pointer;background:var(--primary-color);color:#fff;padding:0.5rem 1rem;border-radius:6px;">В корзину</button>
+                                <?php else: ?>
+                                    <a class="item-order-btn" href="login.php" style="border:none;cursor:pointer;background:#666;color:#fff;padding:0.5rem 1rem;border-radius:6px;">Войти для заказа</a>
+                                <?php endif; ?>
+                                <button type="button" class="quick-view-btn" data-product-id="<?= $pid ?>" style="border:none;cursor:pointer;background:#f0f0f0;color:#333;padding:0.5rem 1rem;border-radius:6px;">Быстрый просмотр</button>
+                            </div>
                         </article>
                 <?php endforeach;
                 endif; ?>
@@ -243,20 +312,17 @@ $review_err = isset($_GET['review_err']);
             </div>
         </div>
     </footer>
-    <script>
-        document.getElementById('searchInput').addEventListener('input', filterProducts);
-        document.getElementById('categoryFilter').addEventListener('change', filterProducts);
-
-        function filterProducts() {
-            const q = document.getElementById('searchInput').value.toLowerCase();
-            const cat = document.getElementById('categoryFilter').value;
-            document.querySelectorAll('#productsGrid .grid-item').forEach(item => {
-                const matchTitle = item.dataset.title.includes(q);
-                const matchCat = cat === '' || item.dataset.cat === cat;
-                item.style.display = (matchTitle && matchCat) ? '' : 'none';
-            });
-        }
-    </script>
+    
+    <!-- Модальное окно быстрого просмотра -->
+    <div id="quickViewModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-content-inner"></div>
+        </div>
+    </div>
+    
+    <meta name="csrf-token" content="<?= get_csrf_token() ?>">
+    <script src="assets/js/cart.js"></script>
 </body>
 
 </html>
