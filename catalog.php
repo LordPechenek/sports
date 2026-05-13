@@ -174,15 +174,15 @@ $review_err = isset($_GET['review_err']);
         <section class="catalog-section">
             <h1>Каталог продуктов</h1>
             <div class="catalog-filters">
-                <input type="text" placeholder="Поиск по названию..." class="search-input" id="searchInput" value="<?= htmlspecialchars($search) ?>">
-                <select class="filter-select" id="categoryFilter">
+                <input type="text" placeholder="Поиск по названию..." class="search-input" id="search-products" value="<?= htmlspecialchars($search) ?>">
+                <select class="filter-select" id="category-filter">
                     <option value="">Все категории</option>
                     <?php foreach ($filter_cats as $fc): ?>
                         <option value="<?= htmlspecialchars($fc['slug'], ENT_QUOTES, 'UTF-8') ?>" <?= $category === $fc['slug'] ? 'selected' : '' ?>><?= htmlspecialchars($fc['name'], ENT_QUOTES, 'UTF-8') ?></option>
                     <?php endforeach; ?>
                 </select>
-                <input type="number" placeholder="Цена от" class="search-input" id="priceMin" value="<?= htmlspecialchars($min_price) ?>" style="max-width:120px;">
-                <input type="number" placeholder="Цена до" class="search-input" id="priceMax" value="<?= htmlspecialchars($max_price) ?>" style="max-width:120px;">
+                <input type="number" placeholder="Цена от" class="search-input" id="price-min" value="<?= htmlspecialchars($min_price) ?>" style="max-width:120px;">
+                <input type="number" placeholder="Цена до" class="search-input" id="price-max" value="<?= htmlspecialchars($max_price) ?>" style="max-width:120px;">
             </div>
             <div class="collection-grid" id="productsGrid">
                 <?php if (empty($products)): ?>
