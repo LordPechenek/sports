@@ -378,12 +378,26 @@ if (shop_table_exists($link, 'catalog')) {
     }
 }
 
-// Загрузка заказов с именами пользователей
+// Загрузка заказов с именами пользователей и элементами заказа
+$orders = [];
 try {
     $res_orders = $link->query("SELECT o.order_id, o.created_at, o.total_amount, o.status, o.admin_comment, o.items_note, o.customer_request, u.username, u.user_id FROM orders o JOIN user u ON o.user_id = u.user_id ORDER BY o.created_at DESC");
     if ($res_orders) {
         $orders = $res_orders->fetch_all(MYSQLI_ASSOC);
         $res_orders->close();
+        
+        // Загружаем элементы для каждого заказа
+        foreach ($orders as &$order) {
+            $oid = (int) $order['order_id'];
+            $items_res = $link->query("SELECT product_id, title, price, quantity, subtotal FROM order_items WHERE order_id = $oid ORDER BY item_id");
+            if ($items_res) {
+                $order['items'] = $items_res->fetch_all(MYSQLI_ASSOC);
+                $items_res->close();
+            } else {
+                $order['items'] = [];
+            }
+        }
+        unset($order);
     }
 } catch (mysqli_sql_exception) {
     $orders = [];
@@ -653,14 +667,27 @@ function getStatusBadge($status)
                                             <a href="profile.php" style="color:var(--primary-color);"><?= htmlspecialchars($order['username']) ?></a>
                                             <div style="font-size:var(--font-xs);color:#888;">user_id: <?= (int) $order['user_id'] ?></div>
                                         </td>
-                                        <td style="max-width:220px;font-size:var(--font-sm);">
-                                            <?php if (!empty($order['items_note'])): ?>
-                                                <div><strong>Заказ:</strong> <?= nl2br(htmlspecialchars((string) $order['items_note'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                        <td style="max-width:280px;font-size:var(--font-sm);">
+                                            <?php if (!empty($order['items'])): ?>
+                                                <div><strong>Товары:</strong></div>
+                                                <ul style="margin:0.5rem 0 0 1rem; padding:0;">
+                                                    <?php foreach ($order['items'] as $item): ?>
+                                                        <li>
+                                                            <?= htmlspecialchars($item['title']) ?> 
+                                                            × <?= (int) $item['quantity'] ?> 
+                                                            = <?= number_format((float) $item['subtotal'], 0, '', ' ') ?> ₽
+                                                        </li>
+                                                    <?php endforeach; ?>
+                                                </ul>
                                             <?php else: ?>
-                                                <span class="text-muted">—</span>
+                                                <?php if (!empty($order['items_note'])): ?>
+                                                    <div><strong>Заказ:</strong> <?= nl2br(htmlspecialchars((string) $order['items_note'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                                <?php else: ?>
+                                                    <span class="text-muted">—</span>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                             <?php if (!empty($order['customer_request'])): ?>
-                                                <div style="margin-top:0.35rem;"><strong>От клиента:</strong> <?= nl2br(htmlspecialchars((string) $order['customer_request'], ENT_QUOTES, 'UTF-8')) ?></div>
+                                                <div style="margin-top:0.5rem;"><strong>От клиента:</strong> <?= nl2br(htmlspecialchars((string) $order['customer_request'], ENT_QUOTES, 'UTF-8')) ?></div>
                                             <?php endif; ?>
                                         </td>
                                         <td><?= number_format((float) $order['total_amount'], 2, ',', ' ') ?> ₽</td>
@@ -682,14 +709,27 @@ function getStatusBadge($status)
                                     </tr>
                                     <tr>
                                         <td colspan="7" style="background:#fafafa;border-bottom:2px solid #eee;">
-                                            <form method="POST" style="display:flex;flex-direction:column;gap:0.5rem;padding:0.5rem 0;">
-                                                <?php csrf_field(); ?>
-                                                <input type="hidden" name="save_order_comment" value="1">
-                                                <input type="hidden" name="order_id" value="<?= (int) $order['order_id'] ?>">
-                                                <label style="font-size:var(--font-sm);font-weight:500;">Комментарий администратора</label>
-                                                <textarea name="admin_comment" class="admin-input" rows="2" placeholder="Например: клиент просил позвонить после 18:00"><?= htmlspecialchars((string) ($order['admin_comment'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
-                                                <button type="submit" class="btn-card approve" style="align-self:flex-start;max-width:200px;">Сохранить комментарий</button>
-                                            </form>
+                                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; padding:0.5rem 0;">
+                                                <div>
+                                                    <form method="POST" style="display:flex;flex-direction:column;gap:0.5rem;">
+                                                        <?php csrf_field(); ?>
+                                                        <input type="hidden" name="save_order_comment" value="1">
+                                                        <input type="hidden" name="order_id" value="<?= (int) $order['order_id'] ?>">
+                                                        <label style="font-size:var(--font-sm);font-weight:500;">Комментарий администратора</label>
+                                                        <textarea name="admin_comment" class="admin-input" rows="2" placeholder="Например: клиент просил позвонить после 18:00"><?= htmlspecialchars((string) ($order['admin_comment'] ?? ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+                                                        <button type="submit" class="btn-card approve" style="align-self:flex-start;max-width:200px;">Сохранить комментарий</button>
+                                                    </form>
+                                                </div>
+                                                <div>
+                                                    <label style="font-size:var(--font-sm);font-weight:500;">Детали заказа</label>
+                                                    <div style="font-size:var(--font-xs); color:#666; margin-top:0.5rem;">
+                                                        <div>Заказ создан: <?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></div>
+                                                        <div>Клиент: <?= htmlspecialchars($order['username']) ?></div>
+                                                        <div>Сумма: <?= number_format((float) $order['total_amount'], 2, ',', ' ') ?> ₽</div>
+                                                        <div>Статус: <?= getStatusBadge($order['status']) ?></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
