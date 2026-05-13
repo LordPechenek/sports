@@ -41,6 +41,14 @@
             </ul>
         </nav>
         <div class="auth-block">
+            <?php 
+            $cart_count = 0;
+            if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
+                foreach ($_SESSION['cart'] as $qty) {
+                    $cart_count += (int) $qty;
+                }
+            }
+            ?>
             <?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']): ?>
                 <div class="block"><?= htmlspecialchars($_SESSION['username'] ?? 'Пользователь') ?></div>
                 <div class="block"><a href="profile.php">Профиль</a></div>
@@ -48,6 +56,12 @@
                 <div class="block"><a href="login.php">Войти</a></div>
                 <div class="block"><a href="reg.php">Регистрация</a></div>
             <?php endif; ?>
+            <div class="block" style="position:relative;">
+                <a href="cart.php"><i class="fas fa-shopping-cart"></i></a>
+                <?php if ($cart_count > 0): ?>
+                    <span style="position:absolute;top:-8px;right:-8px;background:var(--primary-color);color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:50%;min-width:18px;text-align:center;"><?= $cart_count ?></span>
+                <?php endif; ?>
+            </div>
         </div>
     </header>
 
