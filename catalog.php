@@ -78,6 +78,14 @@ $review_err = isset($_GET['review_err']);
             </ul>
         </nav>
         <div class="auth-block">
+            <?php 
+            $cart_count = 0;
+            if (isset($_SESSION['cart']) && is_array($_SESSION['cart'])) {
+                foreach ($_SESSION['cart'] as $qty) {
+                    $cart_count += (int) $qty;
+                }
+            }
+            ?>
             <?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']): ?>
                 <div class="block"><?= htmlspecialchars($_SESSION['username'] ?? 'Пользователь') ?></div>
                 <div class="block"><a href="profile.php">Профиль</a></div>
@@ -85,6 +93,12 @@ $review_err = isset($_GET['review_err']);
                 <div class="block"><a href="login.php">Войти</a></div>
                 <div class="block"><a href="reg.php">Регистрация</a></div>
             <?php endif; ?>
+            <div class="block" style="position:relative;">
+                <a href="cart.php"><i class="fas fa-shopping-cart"></i></a>
+                <?php if ($cart_count > 0): ?>
+                    <span style="position:absolute;top:-8px;right:-8px;background:var(--primary-color);color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:50%;min-width:18px;text-align:center;"><?= $cart_count ?></span>
+                <?php endif; ?>
+            </div>
         </div>
     </header>
     <main>
@@ -128,7 +142,12 @@ $review_err = isset($_GET['review_err']);
 
                             <span class="item-price"><?= $price_fmt ?> ₽</span>
                             <?php if (!empty($_SESSION['logged_in'])): ?>
-                                <a class="item-order-btn" href="order_request.php?product_id=<?= $pid ?>">Заявка на заказ</a>
+                                <form method="POST" action="cart.php" style="display:inline;">
+                                    <?php csrf_field(); ?>
+                                    <input type="hidden" name="action" value="add">
+                                    <input type="hidden" name="product_id" value="<?= $pid ?>">
+                                    <button type="submit" class="item-order-btn" style="border:none;cursor:pointer;background:var(--primary-color);color:#fff;padding:0.5rem 1rem;border-radius:6px;">В корзину</button>
+                                </form>
                             <?php else: ?>
                                 <a class="item-order-btn" href="login.php">Войти для заказа</a>
                             <?php endif; ?>

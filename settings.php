@@ -257,32 +257,74 @@ $link->close();
             <?php endif; ?>
 
             <!-- Заказы -->
-            <?php if ($active_tab === 'orders'): ?>
+            <?php if ($active_tab === 'orders'): 
+                // Загрузка заказов пользователя
+                require_once('connect_db.php');
+                require_once __DIR__ . '/includes/shop_db.php';
+                shop_ensure_schema($link);
+                
+                $user_orders = [];
+                try {
+                    $stmt = $link->prepare("SELECT order_id, created_at, total_amount, status, items_note, customer_request FROM orders WHERE user_id = ? ORDER BY created_at DESC");
+                    $stmt->bind_param("i", $user_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    while ($row = $result->fetch_assoc()) {
+                        $user_orders[] = $row;
+                    }
+                    $stmt->close();
+                } catch (mysqli_sql_exception) {
+                    $user_orders = [];
+                }
+                $link->close();
+                
+                $ordered_success = isset($_GET['ordered']);
+            ?>
                 <div class="settings-section active">
                     <h3>История заказов</h3>
-                    <table class="table-list">
-                        <tr>
-                            <th>№</th>
-                            <th>Дата</th>
-                            <th>Сумма</th>
-                            <th>Статус</th>
-                            <th>Действия</th>
-                        </tr>
-                        <tr>
-                            <td>#10234</td>
-                            <td>10.05.2026</td>
-                            <td>4 200 ₽</td>
-                            <td><span class="badge badge-success">Доставлен</span></td>
-                            <td><button class="btn-sm">Повторить</button> <button class="btn-sm">Чек</button></td>
-                        </tr>
-                        <tr>
-                            <td>#10189</td>
-                            <td>28.04.2026</td>
-                            <td>14 240 ₽</td>
-                            <td><span class="badge badge-warning">В пути</span></td>
-                            <td><button class="btn-sm">Трекинг</button></td>
-                        </tr>
-                    </table>
+                    
+                    <?php if ($ordered_success): ?>
+                        <div class="success-message">Заказ успешно оформлен! Менеджер свяжется с вами в ближайшее время.</div>
+                    <?php endif; ?>
+                    
+                    <?php if (empty($user_orders)): ?>
+                        <p style="color:#666;">У вас пока нет заказов.</p>
+                        <a href="catalog.php" class="btn btn-edit" style="display:inline-block;margin-top:1rem;">Перейти в каталог</a>
+                    <?php else: ?>
+                        <table class="table-list">
+                            <tr>
+                                <th>№</th>
+                                <th>Дата</th>
+                                <th>Состав</th>
+                                <th>Сумма</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                            <?php foreach ($user_orders as $o): 
+                                $status_labels = [
+                                    'new' => ['Новый', 'badge-role'],
+                                    'processing' => ['В обработке', 'badge-warning'],
+                                    'shipped' => ['Отправлен', 'badge-info'],
+                                    'delivered' => ['Доставлен', 'badge-success'],
+                                    'cancelled' => ['Отменён', 'badge-danger']
+                                ];
+                                $status_info = $status_labels[$o['status']] ?? ['Неизвестно', ''];
+                            ?>
+                                <tr>
+                                    <td>#<?= (int) $o['order_id'] ?></td>
+                                    <td><?= date('d.m.Y H:i', strtotime($o['created_at'])) ?></td>
+                                    <td style="max-width:250px;"><?= htmlspecialchars($o['items_note'] ?? '-') ?></td>
+                                    <td><?= number_format((float) $o['total_amount'], 0, '', ' ') ?> ₽</td>
+                                    <td><span class="badge <?= $status_info[1] ?>"><?= $status_info[0] ?></span></td>
+                                    <td>
+                                        <?php if ($o['status'] === 'delivered'): ?>
+                                            <button class="btn-sm">Повторить</button>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </table>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
 
