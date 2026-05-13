@@ -154,9 +154,11 @@ $review_err = isset($_GET['review_err']);
                 <div class="block"><a href="reg.php">Регистрация</a></div>
             <?php endif; ?>
             <div class="block" style="position:relative;">
-                <a href="cart.php"><i class="fas fa-shopping-cart"></i></a>
+                <a href="cart.php" class="cart-icon"><i class="fas fa-shopping-cart"></i></a>
                 <?php if ($cart_count > 0): ?>
-                    <span style="position:absolute;top:-8px;right:-8px;background:var(--primary-color);color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:50%;min-width:18px;text-align:center;"><?= $cart_count ?></span>
+                    <span class="cart-count" style="position:absolute;top:-8px;right:-8px;background:var(--primary-color);color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:50%;min-width:18px;text-align:center;"><?= $cart_count ?></span>
+                <?php else: ?>
+                    <span class="cart-count" style="display:none;position:absolute;top:-8px;right:-8px;background:var(--primary-color);color:#fff;font-size:0.7rem;padding:2px 6px;border-radius:50%;min-width:18px;text-align:center;">0</span>
                 <?php endif; ?>
             </div>
         </div>

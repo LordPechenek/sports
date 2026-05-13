@@ -30,7 +30,7 @@ switch ($action) {
         }
         
         // Проверяем наличие товара
-        $stmt = $link->prepare("SELECT id, name, price, stock FROM shop_catalog WHERE id = ?");
+        $stmt = $link->prepare("SELECT product_id, title, price, stock_qty FROM catalog WHERE product_id = ?");
         $stmt->bind_param("i", $product_id);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -46,10 +46,10 @@ switch ($action) {
         
         // Проверяем доступное количество
         $current_qty = $_SESSION['cart'][$product_id]['quantity'] ?? 0;
-        if ($current_qty + $quantity > $product['stock']) {
+        if ($current_qty + $quantity > $product['stock_qty']) {
             echo json_encode([
                 'success' => false, 
-                'error' => 'Недостаточно товара на складе. Доступно: ' . $product['stock'] . ' шт.'
+                'error' => 'Недостаточно товара на складе. Доступно: ' . $product['stock_qty'] . ' шт.'
             ]);
             exit;
         }
@@ -60,7 +60,7 @@ switch ($action) {
         } else {
             $_SESSION['cart'][$product_id] = [
                 'id' => $product_id,
-                'name' => $product['name'],
+                'name' => $product['title'],
                 'price' => $product['price'],
                 'quantity' => $quantity
             ];
@@ -103,17 +103,17 @@ switch ($action) {
             $response = ['success' => true, 'message' => 'Товар удален'];
         } elseif (isset($_SESSION['cart'][$product_id])) {
             // Проверяем наличие
-            $stmt = $link->prepare("SELECT stock FROM shop_catalog WHERE id = ?");
+            $stmt = $link->prepare("SELECT stock_qty FROM catalog WHERE product_id = ?");
             $stmt->bind_param("i", $product_id);
             $stmt->execute();
             $result = $stmt->get_result();
             $product = $result->fetch_assoc();
             $stmt->close();
             
-            if ($quantity > $product['stock']) {
+            if ($quantity > $product['stock_qty']) {
                 echo json_encode([
                     'success' => false, 
-                    'error' => 'Недостаточно товара на складе. Доступно: ' . $product['stock'] . ' шт.'
+                    'error' => 'Недостаточно товара на складе. Доступно: ' . $product['stock_qty'] . ' шт.'
                 ]);
                 exit;
             }
@@ -139,12 +139,12 @@ switch ($action) {
         // Проверка доступности товаров в корзине
         $unavailable = [];
         foreach ($_SESSION['cart'] as $product_id => $item) {
-            $stmt = $link->prepare("SELECT stock FROM shop_catalog WHERE id = ?");
+            $stmt = $link->prepare("SELECT stock_qty FROM catalog WHERE product_id = ?");
             $stmt->bind_param("i", $product_id);
             $stmt->execute();
             $result = $stmt->get_result();
             
-            if ($result->num_rows === 0 || $result->fetch_assoc()['stock'] < $item['quantity']) {
+            if ($result->num_rows === 0 || $result->fetch_assoc()['stock_qty'] < $item['quantity']) {
                 $unavailable[] = $product_id;
             }
             $stmt->close();

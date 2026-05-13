@@ -282,12 +282,12 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .then(response => response.text())
             .then(html => {
-                const productsGrid = document.querySelector('.products-grid');
+                const productsGrid = document.querySelector('.collection-grid');
                 if (productsGrid) {
                     // Извлекаем только сетку товаров из ответа
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
-                    const newGrid = doc.querySelector('.products-grid');
+                    const newGrid = doc.querySelector('.collection-grid');
                     if (newGrid) {
                         productsGrid.innerHTML = newGrid.innerHTML;
                         
