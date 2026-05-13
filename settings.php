@@ -2,11 +2,11 @@
 session_start();
 require_once __DIR__ . '/csrf.php';
 
+require_once(__DIR__ . '/connect_db.php');
 if (!isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
     header("Location: login.php");
     exit;
 }
-require_once('connect_db.php');
 $user_id = $_SESSION['user_id'];
 $active_tab = $_GET['tab'] ?? 'personal';
 
@@ -119,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'chang
         $error = 'Неверный текущий пароль';
     }
 }
-$link->close();
+// $link->close(); // Перемещено в конец файла или оставлено открытым для вкладок
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -259,7 +259,6 @@ $link->close();
             <!-- Заказы -->
             <?php if ($active_tab === 'orders'): 
                 // Загрузка заказов пользователя
-                require_once('connect_db.php');
                 require_once __DIR__ . '/includes/shop_db.php';
                 shop_ensure_schema($link);
                 
@@ -276,7 +275,7 @@ $link->close();
                 } catch (mysqli_sql_exception) {
                     $user_orders = [];
                 }
-                $link->close();
+                // Не закрываем $link здесь, чтобы избежать ошибок при переключении вкладок
                 
                 $ordered_success = isset($_GET['ordered']);
             ?>
@@ -365,7 +364,5 @@ $link->close();
     </main>
     <footer class="profile-footer">
         <p>&copy; 2024 SportNutrition</p>
-    </footer>
-</body>
-
 </html>
+<?php $link->close(); ?>
